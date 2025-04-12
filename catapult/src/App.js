@@ -1,28 +1,35 @@
-import { useState, useRef, useEffect } from 'react';
-import { Routes, Route, Link, useLocation } from 'react-router-dom';
+import React, { useState, useRef, useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, Link, useLocation, Navigate, useNavigate } from 'react-router-dom';
+import { withAuthenticator } from '@aws-amplify/ui-react';
+import { signOut, getCurrentUser } from '@aws-amplify/auth';
 import './App.css';
+import './aws-config';
+import AuthComponent from './components/Auth';
 
-const API_URL = 'http://localhost:8080';
+const API_URL = 'http://localhost:9000';
 
-function NavBar() {
+function NavBar({ isAuthenticated, onSignOut }) {
   const location = useLocation();
-  
+
   return (
-    <nav className="nav-bar">
-      <div className="nav-buttons">
-        <Link to="/" className={`nav-button ${location.pathname === '/' ? 'active' : ''}`}>
+    <nav className="navbar">
+      <div className="nav-links">
+        <Link to="/" className={location.pathname === '/' ? 'active' : ''}>
           All Videos
         </Link>
-        <Link to="/favorites" className={`nav-button ${location.pathname === '/favorites' ? 'active' : ''}`}>
+        <Link to="/favorites" className={location.pathname === '/favorites' ? 'active' : ''}>
           Favorites
         </Link>
-        <Link to="/realtime" className={`nav-button ${location.pathname === '/realtime' ? 'active' : ''}`}>
-          Realtime
-        </Link>
-        <div className="search-container">
-          <input type="text" placeholder="Search..." className="search-input" />
-        </div>
       </div>
+      {isAuthenticated ? (
+        <button onClick={onSignOut} className="sign-out-button">
+          Sign Out
+        </button>
+      ) : (
+        <Link to="/auth" className="auth-link">
+          Sign In
+        </Link>
+      )}
     </nav>
   );
 }
@@ -138,6 +145,14 @@ function VideoPage({ videos, onVideoClick, onToggleFavorite, showFavoritesOnly }
   const fileInputRef = useRef(null);
   const location = useLocation();
 
+  const handleVideoClick = (video, index) => {
+    setSelectedVideo(video);
+  };
+
+  const handleClosePlayer = () => {
+    setSelectedVideo(null);
+  };
+
   const handleUploadClick = () => {
     fileInputRef.current.click();
   };
@@ -164,27 +179,8 @@ function VideoPage({ videos, onVideoClick, onToggleFavorite, showFavoritesOnly }
     setShowLocationPopup(false);
   };
 
-  const handleCloseExpanded = () => {
-    setSelectedVideo(null);
-  };
-
-  const navigateVideo = (direction) => {
-    if (!selectedVideo) return;
-    
-    const currentVideos = showFavoritesOnly 
-      ? videos.filter(video => video.isFavorite)
-      : videos;
-    
-    const currentIndex = currentVideos.findIndex(v => v.url === selectedVideo.url);
-    const newIndex = direction === 'next' 
-      ? (currentIndex + 1) % currentVideos.length 
-      : (currentIndex - 1 + currentVideos.length) % currentVideos.length;
-    
-    setSelectedVideo({ ...currentVideos[newIndex], index: newIndex });
-  };
-
   return (
-    <div className="page-content">
+    <div className="video-page">
       <input
         type="file"
         ref={fileInputRef}
@@ -198,7 +194,7 @@ function VideoPage({ videos, onVideoClick, onToggleFavorite, showFavoritesOnly }
       
       <VideoGrid
         videos={videos}
-        onVideoClick={setSelectedVideo}
+        onVideoClick={handleVideoClick}
         onToggleFavorite={onToggleFavorite}
         showFavoritesOnly={showFavoritesOnly}
       />
@@ -211,38 +207,10 @@ function VideoPage({ videos, onVideoClick, onToggleFavorite, showFavoritesOnly }
       />
 
       {selectedVideo && (
-        <div className="expanded-video-container">
-          <div className="expanded-video-overlay" onClick={handleCloseExpanded}></div>
-          <div className="expanded-video-content">
-            <div className="video-player-container">
-              <button className="nav-video-button prev" onClick={() => navigateVideo('prev')}>←</button>
-              <video 
-                src={selectedVideo.url} 
-                className="expanded-video"
-                controls
-                autoPlay
-              />
-              <button className="nav-video-button next" onClick={() => navigateVideo('next')}>→</button>
-            </div>
-            <div className="incidents-section">
-              <h2>Incidents</h2>
-              <div className="incidents-list">
-                <div className="incident-item">
-                  <div className="incident-time">00:01:23</div>
-                  <div className="incident-description">Person detected</div>
-                </div>
-                <div className="incident-item">
-                  <div className="incident-time">00:02:45</div>
-                  <div className="incident-description">Motion detected</div>
-                </div>
-                <div className="incident-item">
-                  <div className="incident-time">00:03:12</div>
-                  <div className="incident-description">Object detected</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+        <VideoPlayer
+          video={selectedVideo}
+          onClose={handleClosePlayer}
+        />
       )}
     </div>
   );
@@ -250,60 +218,131 @@ function VideoPage({ videos, onVideoClick, onToggleFavorite, showFavoritesOnly }
 
 function App() {
   const [videos, setVideos] = useState([]);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [currentUser, setCurrentUser] = useState(null);
+
+  const checkAuth = async () => {
+    try {
+      const user = await getCurrentUser();
+      setIsAuthenticated(true);
+      setCurrentUser(user);
+      fetchUserVideos(user.username);
+    } catch (error) {
+      setIsAuthenticated(false);
+      setCurrentUser(null);
+    }
+  };
 
   useEffect(() => {
-    const fetchVideos = async () => {
-      try {
-        const response = await fetch(`${API_URL}/videos`, {
-          credentials: 'include'
-        });
-        if (!response.ok) {
-          throw new Error('Failed to fetch videos');
-        }
-        const data = await response.json();
-        console.log('Fetched videos:', data);
-        setVideos(data.map(video => ({
-          ...video,
-          isFavorite: false,
-        })));
-      } catch (error) {
-        console.error('Error fetching videos:', error);
-      }
-    };
-
-    fetchVideos();
+    checkAuth();
   }, []);
 
+  const fetchUserVideos = async (username) => {
+    try {
+      const response = await fetch(`${API_URL}/videos?user=${username}`, {
+        credentials: 'include'
+      });
+      if (!response.ok) {
+        throw new Error('Failed to fetch videos');
+      }
+      const data = await response.json();
+      setVideos(data.map(video => ({
+        ...video,
+        isFavorite: false,
+      })));
+    } catch (error) {
+      console.error('Error fetching videos:', error);
+    }
+  };
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      setIsAuthenticated(false);
+      setCurrentUser(null);
+      setVideos([]);
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
+  };
+
+  const handleAuthStateChange = (authenticated) => {
+    setIsAuthenticated(authenticated);
+    if (authenticated) {
+      checkAuth();
+    }
+  };
+
   const toggleFavorite = (videoIndex) => {
-    const updatedVideos = [...videos];
-    updatedVideos[videoIndex].isFavorite = !updatedVideos[videoIndex].isFavorite;
-    setVideos(updatedVideos);
+    setVideos(prevVideos => {
+      const newVideos = [...prevVideos];
+      newVideos[videoIndex] = {
+        ...newVideos[videoIndex],
+        isFavorite: !newVideos[videoIndex].isFavorite
+      };
+      return newVideos;
+    });
   };
 
   return (
-    <div className="App">
-      <NavBar />
+    <div className="app">
+      <NavBar isAuthenticated={isAuthenticated} onSignOut={handleSignOut} />
       <Routes>
-        <Route path="/" element={
-          <VideoPage
-            videos={videos}
-            onVideoClick={(video, index) => setVideos([...videos, video])}
-            onToggleFavorite={toggleFavorite}
-            showFavoritesOnly={false}
-          />
-        } />
-        <Route path="/favorites" element={
-          <VideoPage
-            videos={videos}
-            onVideoClick={(video, index) => setVideos([...videos, video])}
-            onToggleFavorite={toggleFavorite}
-            showFavoritesOnly={true}
-          />
-        } />
-        <Route path="/realtime" element={<div className="page-content">Realtime Page</div>} />
+        <Route
+          path="/auth"
+          element={
+            isAuthenticated ? (
+              <Navigate to="/" replace />
+            ) : (
+              <AuthComponent onAuthStateChange={handleAuthStateChange} />
+            )
+          }
+        />
+        <Route
+          path="/"
+          element={
+            isAuthenticated ? (
+              <VideoPage
+                videos={videos}
+                onVideoClick={toggleFavorite}
+                onToggleFavorite={toggleFavorite}
+                showFavoritesOnly={false}
+              />
+            ) : (
+              <Navigate to="/auth" replace />
+            )
+          }
+        />
+        <Route
+          path="/favorites"
+          element={
+            isAuthenticated ? (
+              <VideoPage
+                videos={videos}
+                onVideoClick={toggleFavorite}
+                onToggleFavorite={toggleFavorite}
+                showFavoritesOnly={true}
+              />
+            ) : (
+              <Navigate to="/auth" replace />
+            )
+          }
+        />
       </Routes>
     </div>
   );
 }
 
-export default App;
+// Wrap the App component with withAuthenticator
+const AppWithAuth = withAuthenticator(App);
+
+// Create a wrapper component to handle routing
+const AppWrapper = () => {
+  return (
+    <Router>
+      <AppWithAuth />
+    </Router>
+  );
+};
+
+export default AppWrapper;
