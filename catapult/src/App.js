@@ -1,6 +1,8 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Routes, Route, Link, useLocation } from 'react-router-dom';
 import './App.css';
+
+const API_URL = 'http://localhost:8080';
 
 function NavBar() {
   const location = useLocation();
@@ -32,25 +34,38 @@ function VideoGrid({ videos, onVideoClick, onToggleFavorite, showFavoritesOnly =
 
   return (
     <div className="video-grid">
-      {displayedVideos.map((video, index) => (
-        <div 
-          key={index} 
-          className="video-thumbnail"
-          onClick={() => onVideoClick(video, index)}
-        >
-          <video src={video.url} className="thumbnail-preview" />
-          <div className="video-name">{video.location || video.name}</div>
-          <button 
-            className={`favorite-button ${video.isFavorite ? 'favorited' : ''}`}
-            onClick={(e) => {
-              e.stopPropagation();
-              onToggleFavorite(index);
-            }}
+      {displayedVideos.map((video, index) => {
+        console.log('Rendering video:', video);
+        return (
+          <div 
+            key={index} 
+            className="video-thumbnail"
+            onClick={() => onVideoClick(video, index)}
           >
-            ★
-          </button>
-        </div>
-      ))}
+            <iframe 
+              src={video.url}
+              className="thumbnail-preview"
+              title={video.name}
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+              onError={(e) => {
+                console.error('Error loading video:', video.url, e);
+                e.target.style.display = 'none';
+              }}
+            />
+            <div className="video-name">{video.location || video.name}</div>
+            <button 
+              className={`favorite-button ${video.isFavorite ? 'favorited' : ''}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleFavorite(index);
+              }}
+            >
+              ★
+            </button>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -86,6 +101,30 @@ function LocationPopup({ isOpen, onClose, onSave, videoName }) {
             setLocation('');
             setCustomName('');
           }}>Save</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function VideoPlayer({ video, onClose }) {
+  if (!video) return null;
+
+  return (
+    <div className="video-player-overlay">
+      <div className="video-player-container">
+        <button className="close-button" onClick={onClose}>×</button>
+        <div className="video-player">
+          <iframe
+            src={video.url}
+            title={video.name}
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+            className="video-frame"
+          />
+        </div>
+        <div className="video-info">
+          <h2>{video.location || video.name}</h2>
         </div>
       </div>
     </div>
@@ -211,6 +250,29 @@ function VideoPage({ videos, onVideoClick, onToggleFavorite, showFavoritesOnly }
 
 function App() {
   const [videos, setVideos] = useState([]);
+
+  useEffect(() => {
+    const fetchVideos = async () => {
+      try {
+        const response = await fetch(`${API_URL}/videos`, {
+          credentials: 'include'
+        });
+        if (!response.ok) {
+          throw new Error('Failed to fetch videos');
+        }
+        const data = await response.json();
+        console.log('Fetched videos:', data);
+        setVideos(data.map(video => ({
+          ...video,
+          isFavorite: false,
+        })));
+      } catch (error) {
+        console.error('Error fetching videos:', error);
+      }
+    };
+
+    fetchVideos();
+  }, []);
 
   const toggleFavorite = (videoIndex) => {
     const updatedVideos = [...videos];

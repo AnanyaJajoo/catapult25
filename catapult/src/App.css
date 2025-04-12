@@ -122,8 +122,12 @@
 
 .thumbnail-preview {
   width: 100%;
-  height: 100%;
+  height: 200px;
   object-fit: cover;
+  border-radius: 8px;
+  margin-bottom: 8px;
+  border: none;
+  background-color: #000;
 }
 
 .video-name {
@@ -408,4 +412,11 @@
 .nav-button.active {
   background-color: #61dafb;
   color: #000;
+}
+
+.video-frame {
+  width: 100%;
+  height: 100%;
+  border: none;
+  background-color: #000;
 }

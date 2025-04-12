@@ -133,3 +133,11 @@ dmypy.json
 
 # Node modules
 node_modules/
+
+# Environment variables
+catapult/backend/.env
+catapult/.env
+
+catapult/node_modules/
+*/.env
+.env
