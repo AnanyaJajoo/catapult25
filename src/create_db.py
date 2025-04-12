@@ -6,7 +6,7 @@ import torch
 import faiss
 import numpy as np
 from PIL import Image
-from transformers import AutoProcessor, AutoModel
+from transformers import AutoProcessor, AutoModel, AutoTokenizer
 from tqdm import tqdm
 import pickle
 
@@ -41,9 +41,13 @@ class VideoEmbeddingDatabase:
         self.device = device
         self.model = AutoModel.from_pretrained(model_name).to(device)
         self.processor = AutoProcessor.from_pretrained(model_name, use_fast=True)
+        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
         self.model.eval()
         self.metadata = {}  # {index: (video_path, frame_number, timestamp)}
         self.index = None
+
+        print(f"Using device: {self.device}, with properties:")
+        print(torch.cuda.get_device_properties(0) if self.device == "cuda" else "CPU")
 
     def extract_frames(self, video_path, n_frames):
         """Extract every nth frame from a video."""
@@ -201,6 +205,8 @@ class VideoEmbeddingDatabase:
             })
         
         return results
+    
+
 
 
 def main():
