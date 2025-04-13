@@ -7,6 +7,7 @@ import './App.css';
 function NavBar({ onSignOut }) {
   const location = useLocation();
 
+
   return (
     <nav className="nav-bar">
       <div className="nav-buttons">
