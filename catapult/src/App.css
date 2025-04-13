@@ -434,3 +434,107 @@ html, body {
   color: var(--text-secondary);
   font-size: 0.9rem;
 }
+
+/* Location Popup */
+.popup-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.7);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.popup-content {
+  background-color: var(--surface);
+  padding: 2rem;
+  border-radius: 1rem;
+  width: 100%;
+  max-width: 500px;
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
+}
+
+.popup-content h2 {
+  color: var(--text);
+  margin-bottom: 1.5rem;
+  text-align: center;
+}
+
+.popup-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.form-group label {
+  color: var(--text);
+  font-weight: 500;
+}
+
+.location-input {
+  padding: 0.75rem;
+  border-radius: 0.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background-color: rgba(255, 255, 255, 0.05);
+  color: var(--text);
+  font-size: 1rem;
+  transition: border-color 0.3s;
+}
+
+.location-input:focus {
+  outline: none;
+  border-color: var(--primary);
+}
+
+.error-message {
+  color: var(--error);
+  font-size: 0.875rem;
+  margin-top: 0.25rem;
+}
+
+.popup-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+  margin-top: 2rem;
+}
+
+.popup-button {
+  padding: 0.75rem 1.5rem;
+  border-radius: 0.5rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.popup-button.cancel {
+  background-color: transparent;
+  border: 1px solid var(--text-secondary);
+  color: var(--text-secondary);
+}
+
+.popup-button.cancel:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+  border-color: var(--text);
+  color: var(--text);
+}
+
+.popup-button.save {
+  background-color: var(--primary);
+  border: none;
+  color: white;
+}
+
+.popup-button.save:hover {
+  background-color: var(--primary-dark);
+}

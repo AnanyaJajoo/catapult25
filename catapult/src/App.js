@@ -77,34 +77,58 @@ function VideoGrid({ videos, onVideoClick, onToggleFavorite, showFavoritesOnly =
 function LocationPopup({ isOpen, onClose, onSave, videoName }) {
   const [location, setLocation] = useState('');
   const [customName, setCustomName] = useState('');
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (isOpen) {
+      setLocation('');
+      setCustomName('');
+      setError('');
+    }
+  }, [isOpen]);
+
+  const handleSave = () => {
+    if (!customName.trim()) {
+      setError('Please enter a video name');
+      return;
+    }
+    onSave(location.trim(), customName.trim());
+  };
 
   if (!isOpen) return null;
 
   return (
     <div className="popup-overlay">
       <div className="popup-content">
-        <h2>Add Details for {videoName}</h2>
-        <input
-          type="text"
-          placeholder="Enter video name"
-          value={customName}
-          onChange={(e) => setCustomName(e.target.value)}
-          className="location-input"
-        />
-        <input
-          type="text"
-          placeholder="Enter video location"
-          value={location}
-          onChange={(e) => setLocation(e.target.value)}
-          className="location-input"
-        />
+        <h2>Add Video Details</h2>
+        <div className="popup-form">
+          <div className="form-group">
+            <label htmlFor="video-name">Video Name</label>
+            <input
+              id="video-name"
+              type="text"
+              placeholder="Enter video name"
+              value={customName}
+              onChange={(e) => setCustomName(e.target.value)}
+              className="location-input"
+            />
+            {error && <span className="error-message">{error}</span>}
+          </div>
+          <div className="form-group">
+            <label htmlFor="video-location">Location</label>
+            <input
+              id="video-location"
+              type="text"
+              placeholder="Enter video location"
+              value={location}
+              onChange={(e) => setLocation(e.target.value)}
+              className="location-input"
+            />
+          </div>
+        </div>
         <div className="popup-buttons">
           <button className="popup-button cancel" onClick={onClose}>Cancel</button>
-          <button className="popup-button save" onClick={() => {
-            onSave(location, customName);
-            setLocation('');
-            setCustomName('');
-          }}>Save</button>
+          <button className="popup-button save" onClick={handleSave}>Save</button>
         </div>
       </div>
     </div>
@@ -260,7 +284,6 @@ function VideoPage({ videos, onVideoClick, onToggleFavorite, showFavoritesOnly =
           isFavorite: false
         };
         
-        onVideoClick(newVideo);
         setPendingVideo(newVideo);
         setShowLocationPopup(true);
       } catch (error) {
@@ -271,7 +294,12 @@ function VideoPage({ videos, onVideoClick, onToggleFavorite, showFavoritesOnly =
 
   const handleLocationSave = (location, customName) => {
     if (pendingVideo) {
-      onVideoClick({ ...pendingVideo, location, customName });
+      const updatedVideo = {
+        ...pendingVideo,
+        location,
+        customName
+      };
+      onVideoClick(updatedVideo);
       setPendingVideo(null);
     }
     setShowLocationPopup(false);
@@ -308,8 +336,8 @@ function VideoPage({ videos, onVideoClick, onToggleFavorite, showFavoritesOnly =
       />
       {!showFavoritesOnly && (
         <div className="upload-button-container">
-        <button className="upload-button" onClick={handleUploadClick}>Upload Video</button>
-      </div>
+          <button className="upload-button" onClick={handleUploadClick}>Upload Video</button>
+        </div>
       )}
       
       <VideoGrid
