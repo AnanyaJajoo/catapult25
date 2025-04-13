@@ -421,7 +421,7 @@ function App() {
   }
 
   return (
-    <div className="App">
+    <div className="main-wrapper">
       <NavBar searchQuery={searchQuery} onSearchChange={setSearchQuery} />
       <Routes>
         <Route path="/" element={<HomePage />} />

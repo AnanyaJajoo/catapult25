@@ -262,3 +262,15 @@ body {
 .error-container button:hover {
   background-color: var(--primary-dark);
 }
+
+.main-wrapper {
+  min-height: 100vh;
+  width: 100%;
+  background-color: var(--background) !important;
+  overflow-x: hidden;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+}
