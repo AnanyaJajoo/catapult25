@@ -36,6 +36,48 @@ def print_type_tree(structure, indent=0):
     else:
         print(" " * indent + f"{type(structure).__name__}")
 
+def extract_frames(video_path, n_frames=30):
+    """Extract every nth frame from a video using direct seeking."""
+    frames = []
+    frame_numbers = []
+    timestamps = []
+        
+    cap = cv2.VideoCapture(video_path)
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        
+    # Calculate which frames to extract
+    target_frames = range(0, total_frames, n_frames)
+        
+    with tqdm(total=len(target_frames), desc=f"Extracting frames from {os.path.basename(video_path)}") as pbar:
+        for frame_number in target_frames:
+            # Set position to the desired frame
+            cap.set(cv2.CAP_PROP_POS_FRAMES, frame_number)
+            
+            # Read the frame
+            ret, frame = cap.read()
+            if not ret:
+                break
+                
+                # Process the frame
+            timestamp = frame_number / fps
+            rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            pil_image = Image.fromarray(rgb_frame)
+                
+            frames.append(pil_image)
+            frame_numbers.append(frame_number)
+            timestamps.append(timestamp)
+            pbar.update(1)
+        
+    cap.release()
+    return frames, frame_numbers, timestamps
+
+def extract_all_videos(video_paths):
+            import multiprocessing
+            with multiprocessing.Pool() as pool:
+                results = pool.map(extract_frames, video_paths)
+            return results
+
 class VideoEmbeddingDatabase:
     def __init__(self, model_name="google/siglip2-giant-opt-patch16-384", device="cuda" if torch.cuda.is_available() else "cpu"):
         self.device = device
@@ -49,38 +91,7 @@ class VideoEmbeddingDatabase:
         print(f"Using device: {self.device}, with properties:")
         print(torch.cuda.get_device_properties(0) if self.device == "cuda" else "CPU")
 
-    def extract_frames(self, video_path, n_frames):
-        """Extract every nth frame from a video."""
-        frames = []
-        frame_numbers = []
-        timestamps = []
-        
-        cap = cv2.VideoCapture(video_path)
-        fps = cap.get(cv2.CAP_PROP_FPS)
-        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-        
-        frame_count = 0
-        with tqdm(total=total_frames//n_frames, desc=f"Extracting frames from {os.path.basename(video_path)}") as pbar:
-            while True:
-                ret, frame = cap.read()
-                if not ret:
-                    break
-                
-                if frame_count % n_frames == 0:
-                    timestamp = frame_count / fps
-                    # Convert BGR (OpenCV format) to RGB (PIL format)
-                    rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                    pil_image = Image.fromarray(rgb_frame)
-                    
-                    frames.append(pil_image)
-                    frame_numbers.append(frame_count)
-                    timestamps.append(timestamp)
-                    pbar.update(1)
-                
-                frame_count += 1
-        
-        cap.release()
-        return frames, frame_numbers, timestamps
+
 
     def generate_embeddings(self, frames, batch_size=1):
         """Generate embeddings for a list of frames using SigLIP2."""
@@ -104,17 +115,18 @@ class VideoEmbeddingDatabase:
 
     def build_database(self, video_dir, n_frames=30):
         """Build a FAISS index from videos in the specified directory."""
-        video_paths = glob.glob(os.path.join(video_dir, "*.mp4"))
+        ''' and in all subdirectories '''
+        video_paths = glob.glob(os.path.join(video_dir, "**", "*.mp4"), recursive=True)
         if not video_paths:
             raise ValueError(f"No MP4 videos found in {video_dir}")
-        
+                
         all_embeddings = []
         index_counter = 0
         
-        for video_path in video_paths:
-            print(f"Processing {video_path}")
-            frames, frame_numbers, timestamps = self.extract_frames(video_path, n_frames)
-            
+        # Extract frames from all videos
+        results = extract_all_videos(video_paths)
+        for video_path, (frames, frame_numbers, timestamps) in zip(video_paths, results):
+
             if not frames:
                 print(f"No frames extracted from {video_path}")
                 continue
