@@ -266,11 +266,171 @@ body {
 .main-wrapper {
   min-height: 100vh;
   width: 100%;
-  background-color: var(--background) !important;
+  background: linear-gradient(135deg, #000000, #2d1b69) !important;
   overflow-x: hidden;
 }
 
 html, body {
   width: 100%;
   height: 100%;
+}
+
+/* Video Player Overlay */
+.video-player-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.9);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  padding: 2rem;
+}
+
+.video-player-overlay.expanded {
+  padding: 0;
+}
+
+.video-player-container {
+  position: relative;
+  width: 100%;
+  max-width: 1200px;
+  background-color: var(--surface);
+  border-radius: 1rem;
+  overflow: hidden;
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+}
+
+.close-button {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  background: none;
+  border: none;
+  color: var(--text);
+  font-size: 2rem;
+  cursor: pointer;
+  z-index: 1001;
+  transition: transform 0.2s;
+}
+
+.close-button:hover {
+  transform: scale(1.2);
+}
+
+.video-player-content {
+  display: flex;
+  height: 80vh;
+}
+
+.video-player-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 1rem;
+}
+
+.video-player {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: #000;
+  border-radius: 0.5rem;
+  overflow: hidden;
+}
+
+.video-frame {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.video-info {
+  padding: 1rem 0;
+  text-align: center;
+}
+
+.video-info h2 {
+  margin-bottom: 0.5rem;
+  color: var(--text);
+}
+
+.video-time {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.video-navigation {
+  display: flex;
+  justify-content: space-between;
+  padding: 1rem 0;
+}
+
+.nav-button {
+  background-color: var(--primary);
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.nav-button:disabled {
+  background-color: var(--text-secondary);
+  cursor: not-allowed;
+}
+
+.nav-button:hover:not(:disabled) {
+  background-color: var(--primary-dark);
+}
+
+.video-timeline {
+  width: 300px;
+  background-color: var(--surface);
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 1rem;
+  overflow-y: auto;
+}
+
+.video-timeline h3 {
+  margin-bottom: 1rem;
+  color: var(--text);
+}
+
+.incidents-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.incident-item {
+  padding: 0.75rem;
+  background-color: rgba(255, 255, 255, 0.05);
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.incident-item:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.incident-item.active {
+  background-color: var(--primary);
+}
+
+.incident-time {
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 0.25rem;
+}
+
+.incident-description {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
 }

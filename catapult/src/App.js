@@ -115,6 +115,7 @@ function VideoPlayer({ video, onClose, onNext, onPrev, hasNext, hasPrev }) {
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const videoRef = useRef(null);
+  const [isExpanded, setIsExpanded] = useState(false);
 
   // Mock incidents data - replace with your actual data
   const incidents = [
@@ -151,7 +152,7 @@ function VideoPlayer({ video, onClose, onNext, onPrev, hasNext, hasPrev }) {
   if (!video) return null;
 
   return (
-    <div className="video-player-overlay">
+    <div className={`video-player-overlay ${isExpanded ? 'expanded' : ''}`}>
       <div className="video-player-container">
         <button className="close-button" onClick={onClose}>×</button>
         <div className="video-player-content">
