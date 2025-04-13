@@ -12,7 +12,6 @@ Traditional surveillance relies heavily on human attention: dozens of screens, h
 - 🏃 Panic-induced running or sudden movements  
 - 🎒 Unattended or hazardous objects  
 - 👥 Dense crowd formations signaling unrest  
-- 🔍 Queries like “person in red jacket near Gate 3”  
 - 📝 Overlay dynamic labels or alerts on live feeds  
 - 📢 Push real-time notifications with actionable insights  
 
