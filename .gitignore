@@ -139,5 +139,7 @@ catapult/backend/.env
 catapult/.env
 
 catapult/node_modules/
+catapult/backend/output/
+catapult/backend/processing_data/
 */.env
 .env
