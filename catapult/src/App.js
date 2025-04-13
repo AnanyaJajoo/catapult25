@@ -306,7 +306,9 @@ function VideoPage({ videos, onVideoClick, onToggleFavorite, showFavoritesOnly =
         style={{ display: 'none' }}
       />
       {!showFavoritesOnly && (
+        <div className="upload-button-container">
         <button className="upload-button" onClick={handleUploadClick}>Upload Video</button>
+      </div>
       )}
       
       <VideoGrid
