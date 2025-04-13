@@ -45,7 +45,7 @@ function VideoGrid({ videos, onVideoClick, onToggleFavorite, showFavoritesOnly =
           <video 
             src={video.url}
             className="thumbnail-preview"
-            title={video.name}
+            title={video.customName || video.name}
             muted
             autoPlay
             loop
@@ -53,7 +53,7 @@ function VideoGrid({ videos, onVideoClick, onToggleFavorite, showFavoritesOnly =
             style={{ pointerEvents: 'none' }}
           />
           <div className="video-info-container">
-            <div className="video-name">{video.name}</div>
+            <div className="video-name">{video.customName || video.name}</div>
             <div className="video-location">{video.location || 'No location specified'}</div>
           </div>
           <button 
