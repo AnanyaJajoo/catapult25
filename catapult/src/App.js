@@ -1,8 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Routes, Route, Link, useLocation } from 'react-router-dom';
+import { s3 } from './aws-config';
 import './App.css';
-
-const API_URL = 'http://localhost:8080';
 
 function NavBar() {
   const location = useLocation();
@@ -142,12 +141,45 @@ function VideoPage({ videos, onVideoClick, onToggleFavorite, showFavoritesOnly }
     fileInputRef.current.click();
   };
 
-  const handleFileChange = (event) => {
+  const handleFileChange = async (event) => {
     const file = event.target.files[0];
     if (file && file.type.startsWith('video/')) {
-      const videoUrl = URL.createObjectURL(file);
-      setPendingVideo({ url: videoUrl, name: file.name });
-      setShowLocationPopup(true);
+      try {
+        const bucketName = process.env.REACT_APP_AWS_BUCKET_NAME;
+        if (!bucketName) {
+          throw new Error('Bucket name is not defined in environment variables');
+        }
+
+        // Generate a unique key for the video
+        const key = `videos/${Date.now()}-${file.name}`;
+        
+        // Upload the file to S3
+        const uploadParams = {
+          Bucket: bucketName,
+          Key: key,
+          Body: file,
+          ContentType: file.type
+        };
+        console.log('Upload params:', uploadParams);
+        
+        await s3.putObject(uploadParams).promise();
+        
+        // Get the signed URL for the uploaded video
+        const urlParams = {
+          Bucket: bucketName,
+          Key: key,
+          Expires: 3600 // URL expires in 1 hour
+        };
+        console.log('URL params:', urlParams);
+        
+        const url = await s3.getSignedUrlPromise('getObject', urlParams);
+        
+        const videoUrl = url;
+        setPendingVideo({ url: videoUrl, name: file.name, key });
+        setShowLocationPopup(true);
+      } catch (error) {
+        console.error('Error uploading video:', error);
+      }
     }
   };
 
@@ -251,27 +283,39 @@ function VideoPage({ videos, onVideoClick, onToggleFavorite, showFavoritesOnly }
 function App() {
   const [videos, setVideos] = useState([]);
 
-  useEffect(() => {
-    const fetchVideos = async () => {
-      try {
-        const response = await fetch(`${API_URL}/videos`, {
-          credentials: 'include'
-        });
-        if (!response.ok) {
-          throw new Error('Failed to fetch videos');
-        }
-        const data = await response.json();
-        console.log('Fetched videos:', data);
-        setVideos(data.map(video => ({
-          ...video,
-          isFavorite: false,
-        })));
-      } catch (error) {
-        console.error('Error fetching videos:', error);
-      }
-    };
+  const fetchUserVideos = async () => {
+    try {
+      const params = {
+        Bucket: process.env.REACT_APP_AWS_BUCKET_NAME,
+        Prefix: 'videos/'
+      };
 
-    fetchVideos();
+      const data = await s3.listObjectsV2(params).promise();
+      
+      const videos = await Promise.all(
+        data.Contents.map(async (item) => {
+          const url = await s3.getSignedUrlPromise('getObject', {
+            Bucket: process.env.REACT_APP_AWS_BUCKET_NAME,
+            Key: item.Key,
+            Expires: 3600
+          });
+          
+          return {
+            url,
+            name: item.Key.split('/').pop(),
+            key: item.Key
+          };
+        })
+      );
+
+      setVideos(videos);
+    } catch (error) {
+      console.error('Error fetching videos:', error);
+    }
+  };
+
+  useEffect(() => {
+    fetchUserVideos();
   }, []);
 
   const toggleFavorite = (videoIndex) => {
