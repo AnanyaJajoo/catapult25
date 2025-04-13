@@ -1,28 +1,31 @@
-import { useState, useRef, useEffect } from 'react';
-import { Routes, Route, Link, useLocation } from 'react-router-dom';
+import React, { useState, useRef, useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
 import { s3 } from './aws-config';
+import HomePage from './components/HomePage';
 import './App.css';
 
 function NavBar() {
+  const [searchQuery, setSearchQuery] = useState('');
   const location = useLocation();
-  
+  const isHomePage = location.pathname === '/';
+
+  if (isHomePage) return null;
+
   return (
     <nav className="nav-bar">
-      <Link to="/" className="logo">
-        <span>Spectra</span>
-      </Link>
-      <div className="nav-buttons">
-        <Link to="/" className={`nav-button ${location.pathname === '/' ? 'active' : ''}`}>
-          All Videos
-        </Link>
-        <Link to="/favorites" className={`nav-button ${location.pathname === '/favorites' ? 'active' : ''}`}>
-          Favorites
-        </Link>
-        <Link to="/realtime" className={`nav-button ${location.pathname === '/realtime' ? 'active' : ''}`}>
-          Realtime
-        </Link>
+      <Link to="/" className="logo">Spectra</Link>
+      <div className="nav-links">
+        <Link to="/">Home</Link>
+        <Link to="/videos">All Videos</Link>
+        <Link to="/favorites">Favorites</Link>
         <div className="search-container">
-          <input type="text" placeholder="Search videos..." className="search-input" />
+          <input
+            type="text"
+            placeholder="Search videos..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="search-input"
+          />
         </div>
       </div>
     </nav>
@@ -209,48 +212,22 @@ function VideoPlayer({ video, onClose, onNext, onPrev, hasNext, hasPrev }) {
   );
 }
 
-function VideoPage({ onVideoClick, onToggleFavorite, showFavoritesOnly }) {
+function VideoPage({ videos, onVideoClick, onToggleFavorite, showFavoritesOnly = false, searchQuery = '' }) {
   const [selectedVideo, setSelectedVideo] = useState(null);
   const [showLocationPopup, setShowLocationPopup] = useState(false);
   const [pendingVideo, setPendingVideo] = useState(null);
-  const [videos, setVideos] = useState([]);
   const fileInputRef = useRef(null);
-  const location = useLocation();
 
-  useEffect(() => {
-    fetchUserVideos();
-  }, []);
-
-  const fetchUserVideos = async () => {
-    try {
-      const params = {
-        Bucket: process.env.REACT_APP_AWS_BUCKET_NAME,
-        Prefix: 'videos/'
-      };
-
-      const data = await s3.listObjectsV2(params).promise();
-      
-      const videos = await Promise.all(
-        data.Contents.map(async (item) => {
-          const url = await s3.getSignedUrlPromise('getObject', {
-            Bucket: process.env.REACT_APP_AWS_BUCKET_NAME,
-            Key: item.Key,
-            Expires: 3600
-          });
-          
-          return {
-            url,
-            name: item.Key.split('/').pop(),
-            key: item.Key
-          };
-        })
-      );
-
-      setVideos(videos);
-    } catch (error) {
-      console.error('Error fetching videos:', error);
-    }
-  };
+  // Filter videos based on search query
+  const filteredVideos = videos.filter(video => {
+    if (!searchQuery) return true;
+    const searchLower = searchQuery.toLowerCase();
+    return (
+      (video.customName && video.customName.toLowerCase().includes(searchLower)) ||
+      (video.location && video.location.toLowerCase().includes(searchLower)) ||
+      (video.name && video.name.toLowerCase().includes(searchLower))
+    );
+  });
 
   const handleUploadClick = () => {
     fileInputRef.current.click();
@@ -262,7 +239,6 @@ function VideoPage({ onVideoClick, onToggleFavorite, showFavoritesOnly }) {
       try {
         const key = `videos/${Date.now()}-${file.name}`;
         
-        // Upload the file to S3
         await s3.putObject({
           Bucket: process.env.REACT_APP_AWS_BUCKET_NAME,
           Key: key,
@@ -270,14 +246,12 @@ function VideoPage({ onVideoClick, onToggleFavorite, showFavoritesOnly }) {
           ContentType: file.type
         }).promise();
         
-        // Get the signed URL for the uploaded video
         const url = await s3.getSignedUrlPromise('getObject', {
           Bucket: process.env.REACT_APP_AWS_BUCKET_NAME,
           Key: key,
           Expires: 3600
         });
         
-        // Add the new video to the state
         const newVideo = {
           url,
           name: file.name,
@@ -285,7 +259,7 @@ function VideoPage({ onVideoClick, onToggleFavorite, showFavoritesOnly }) {
           isFavorite: false
         };
         
-        setVideos(prevVideos => [...prevVideos, newVideo]);
+        onVideoClick(newVideo);
         setPendingVideo(newVideo);
         setShowLocationPopup(true);
       } catch (error) {
@@ -296,13 +270,7 @@ function VideoPage({ onVideoClick, onToggleFavorite, showFavoritesOnly }) {
 
   const handleLocationSave = (location, customName) => {
     if (pendingVideo) {
-      setVideos(prevVideos => 
-        prevVideos.map(video => 
-          video.key === pendingVideo.key 
-            ? { ...video, location, customName }
-            : video
-        )
-      );
+      onVideoClick({ ...pendingVideo, location, customName });
       setPendingVideo(null);
     }
     setShowLocationPopup(false);
@@ -317,23 +285,15 @@ function VideoPage({ onVideoClick, onToggleFavorite, showFavoritesOnly }) {
   };
 
   const handleNextVideo = () => {
-    if (selectedVideo && selectedVideo.index < videos.length - 1) {
-      setSelectedVideo({ ...videos[selectedVideo.index + 1], index: selectedVideo.index + 1 });
+    if (selectedVideo && selectedVideo.index < filteredVideos.length - 1) {
+      setSelectedVideo({ ...filteredVideos[selectedVideo.index + 1], index: selectedVideo.index + 1 });
     }
   };
 
   const handlePrevVideo = () => {
     if (selectedVideo && selectedVideo.index > 0) {
-      setSelectedVideo({ ...videos[selectedVideo.index - 1], index: selectedVideo.index - 1 });
+      setSelectedVideo({ ...filteredVideos[selectedVideo.index - 1], index: selectedVideo.index - 1 });
     }
-  };
-
-  const handleToggleFavorite = (index) => {
-    setVideos(prevVideos => 
-      prevVideos.map((video, i) => 
-        i === index ? { ...video, isFavorite: !video.isFavorite } : video
-      )
-    );
   };
 
   return (
@@ -350,9 +310,9 @@ function VideoPage({ onVideoClick, onToggleFavorite, showFavoritesOnly }) {
       )}
       
       <VideoGrid
-        videos={videos}
+        videos={filteredVideos}
         onVideoClick={handleVideoClick}
-        onToggleFavorite={handleToggleFavorite}
+        onToggleFavorite={onToggleFavorite}
         showFavoritesOnly={showFavoritesOnly}
         isPlaying={!selectedVideo}
       />
@@ -363,7 +323,7 @@ function VideoPage({ onVideoClick, onToggleFavorite, showFavoritesOnly }) {
           onClose={handleCloseVideo}
           onNext={handleNextVideo}
           onPrev={handlePrevVideo}
-          hasNext={selectedVideo.index < videos.length - 1}
+          hasNext={selectedVideo.index < filteredVideos.length - 1}
           hasPrev={selectedVideo.index > 0}
         />
       )}
@@ -380,15 +340,23 @@ function VideoPage({ onVideoClick, onToggleFavorite, showFavoritesOnly }) {
 
 function App() {
   const [videos, setVideos] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const fetchUserVideos = async () => {
     try {
+      setIsLoading(true);
+      setError(null);
+      
       const params = {
         Bucket: process.env.REACT_APP_AWS_BUCKET_NAME,
         Prefix: 'videos/'
       };
 
+      console.log('Fetching videos with params:', params);
       const data = await s3.listObjectsV2(params).promise();
+      console.log('Received S3 data:', data);
       
       const videos = await Promise.all(
         data.Contents.map(async (item) => {
@@ -401,14 +369,19 @@ function App() {
           return {
             url,
             name: item.Key.split('/').pop(),
-            key: item.Key
+            key: item.Key,
+            isFavorite: false
           };
         })
       );
 
+      console.log('Processed videos:', videos);
       setVideos(videos);
     } catch (error) {
       console.error('Error fetching videos:', error);
+      setError(error.message);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -416,33 +389,58 @@ function App() {
     fetchUserVideos();
   }, []);
 
-  const toggleFavorite = (videoIndex) => {
+  const handleVideoClick = (video) => {
+    setVideos(prevVideos => [...prevVideos, video]);
+  };
+
+  const handleToggleFavorite = (index) => {
     const updatedVideos = [...videos];
-    updatedVideos[videoIndex].isFavorite = !updatedVideos[videoIndex].isFavorite;
+    updatedVideos[index].isFavorite = !updatedVideos[index].isFavorite;
     setVideos(updatedVideos);
   };
 
+  if (isLoading) {
+    return (
+      <div className="loading-container">
+        <div className="loading-spinner"></div>
+        <p>Loading videos...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="error-container">
+        <h2>Error Loading Videos</h2>
+        <p>{error}</p>
+        <button onClick={fetchUserVideos}>Try Again</button>
+      </div>
+    );
+  }
+
   return (
     <div className="App">
-      <NavBar />
+      <NavBar searchQuery={searchQuery} onSearchChange={setSearchQuery} />
       <Routes>
-        <Route path="/" element={
+        <Route path="/" element={<HomePage />} />
+        <Route path="/videos" element={
           <VideoPage
             videos={videos}
-            onVideoClick={(video, index) => setVideos([...videos, video])}
-            onToggleFavorite={toggleFavorite}
+            onVideoClick={handleVideoClick}
+            onToggleFavorite={handleToggleFavorite}
             showFavoritesOnly={false}
+            searchQuery={searchQuery}
           />
         } />
         <Route path="/favorites" element={
           <VideoPage
             videos={videos}
-            onVideoClick={(video, index) => setVideos([...videos, video])}
-            onToggleFavorite={toggleFavorite}
+            onVideoClick={handleVideoClick}
+            onToggleFavorite={handleToggleFavorite}
             showFavoritesOnly={true}
+            searchQuery={searchQuery}
           />
         } />
-        <Route path="/realtime" element={<div className="page-content">Realtime Page</div>} />
       </Routes>
     </div>
   );
