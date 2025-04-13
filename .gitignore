@@ -130,6 +130,7 @@ dmypy.json
 *.avi
 *.mov
 *.mkv
+*.pkl
 
 # Node modules
 node_modules/
