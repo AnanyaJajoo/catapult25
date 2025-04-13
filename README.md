@@ -19,6 +19,18 @@ Spectra turns **cameras into collaborators**, enabling smarter, faster responses
 
 ---
 
+## 🔧 Built With
+
+[![AWS](https://img.shields.io/badge/AWS-232F3E?style=for-the-badge&logo=amazon-aws&logoColor=white)](https://aws.amazon.com/)
+[![Groq](https://img.shields.io/badge/Groq-FF6F00?style=for-the-badge&logo=groq&logoColor=white)](https://groq.com/)
+[![Whisper](https://img.shields.io/badge/Whisper-0041C2?style=for-the-badge&logo=openai&logoColor=white)](https://openai.com/research/whisper)
+[![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
+[![React](https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)](https://reactjs.org/)
+[![Roboflow](https://img.shields.io/badge/Roboflow-101010?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB...)](https://roboflow.com/)
+[![Pydub](https://img.shields.io/badge/Pydub-FFDD57?style=for-the-badge&logo=python&logoColor=black)](https://github.com/jiaaro/pydub)
+
+---
+
 ## 🛠️ How It Works
 
 ### 🔹 Frontend  
@@ -75,16 +87,4 @@ Spectra turns **cameras into collaborators**, enabling smarter, faster responses
 - **Mobile dashboards** for first responders  
 - **Multilingual support** for prompt-based search  
 - **Plugin architecture** for 3rd-party integration  
-
----
-
-## 🔧 Built With
-
-[![AWS](https://img.shields.io/badge/AWS-232F3E?style=for-the-badge&logo=amazon-aws&logoColor=white)](https://aws.amazon.com/)
-[![Groq](https://img.shields.io/badge/Groq-FF6F00?style=for-the-badge&logo=groq&logoColor=white)](https://groq.com/)
-[![Whisper](https://img.shields.io/badge/Whisper-0041C2?style=for-the-badge&logo=openai&logoColor=white)](https://openai.com/research/whisper)
-[![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
-[![React](https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)](https://reactjs.org/)
-[![Roboflow](https://img.shields.io/badge/Roboflow-101010?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB...)](https://roboflow.com/)
-[![Pydub](https://img.shields.io/badge/Pydub-FFDD57?style=for-the-badge&logo=python&logoColor=black)](https://github.com/jiaaro/pydub)
 
