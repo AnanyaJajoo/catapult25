@@ -1,10 +1,11 @@
 import os
+os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 import cv2
 import torch
 import faiss
 import numpy as np
 from PIL import Image
-from transformers import AutoProcessor, AutoModel
+from transformers import AutoProcessor, AutoModel, AutoTokenizer
 import pickle
 from flask import Flask, request, jsonify
 from werkzeug.utils import secure_filename
@@ -27,6 +28,7 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 print(f"Loading model: {MODEL_NAME}...")
 model = AutoModel.from_pretrained(MODEL_NAME).to(DEVICE).eval()
 processor = AutoProcessor.from_pretrained(MODEL_NAME)
+tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
 print("Model loaded.")
 
 # --- Database Lock ---
@@ -134,18 +136,18 @@ def encode_text(text_query):
     try:
         # Note: SigLIP models process text and images differently.
         # Use the processor for text input.
-        inputs = processor(text=[text_query], return_tensors="pt", padding=True, truncation=True).to(DEVICE)
+        # inputs = processor(text=[text_query], return_tensors="pt", padding=True, truncation=True).to(DEVICE)
+        inputs = tokenizer([text_query], return_tensors="pt", padding="max_length", truncation=True).to(DEVICE)
         with torch.no_grad():
-            outputs = model(**inputs)
             # --- Adjust based on your specific SigLIP model output ---
             # Option 1: If model output has 'text_embeds' directly
             # text_embedding = outputs.text_embeds
             # Option 2: If it's nested under text_model_output
-            text_embedding = outputs.text_model_output.pooler_output
+            text_embedding = model.get_text_features(**inputs)
             # --- End Adjust ---
-        return text_embedding.cpu().numpy()
+        return text_embedding.detach().cpu().numpy()
     except Exception as e:
-        print(f"Error encoding text '{text_query}': {e}")
+        print(f"Error (1) encoding text '{text_query}': {e}")
         return None
 
 # --- Flask Routes ---
