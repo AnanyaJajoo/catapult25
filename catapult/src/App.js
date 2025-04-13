@@ -8,6 +8,9 @@ function NavBar() {
   
   return (
     <nav className="nav-bar">
+      <Link to="/" className="logo">
+        <span>Spectra</span>
+      </Link>
       <div className="nav-buttons">
         <Link to="/" className={`nav-button ${location.pathname === '/' ? 'active' : ''}`}>
           All Videos
@@ -19,52 +22,51 @@ function NavBar() {
           Realtime
         </Link>
         <div className="search-container">
-          <input type="text" placeholder="Search..." className="search-input" />
+          <input type="text" placeholder="Search videos..." className="search-input" />
         </div>
       </div>
     </nav>
   );
 }
 
-function VideoGrid({ videos, onVideoClick, onToggleFavorite, showFavoritesOnly = false }) {
+function VideoGrid({ videos, onVideoClick, onToggleFavorite, showFavoritesOnly = false, isPlaying = false }) {
   const displayedVideos = showFavoritesOnly 
     ? videos.filter(video => video.isFavorite)
     : videos;
 
   return (
     <div className="video-grid">
-      {displayedVideos.map((video, index) => {
-        console.log('Rendering video:', video);
-        return (
-          <div 
-            key={index} 
-            className="video-thumbnail"
-            onClick={() => onVideoClick(video, index)}
-          >
-            <iframe 
-              src={video.url}
-              className="thumbnail-preview"
-              title={video.name}
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-              onError={(e) => {
-                console.error('Error loading video:', video.url, e);
-                e.target.style.display = 'none';
-              }}
-            />
-            <div className="video-name">{video.location || video.name}</div>
-            <button 
-              className={`favorite-button ${video.isFavorite ? 'favorited' : ''}`}
-              onClick={(e) => {
-                e.stopPropagation();
-                onToggleFavorite(index);
-              }}
-            >
-              ★
-            </button>
+      {displayedVideos.map((video, index) => (
+        <div 
+          key={index} 
+          className="video-thumbnail"
+          onClick={() => onVideoClick(video, index)}
+        >
+          <video 
+            src={video.url}
+            className="thumbnail-preview"
+            title={video.name}
+            muted
+            autoPlay
+            loop
+            playsInline
+            style={{ pointerEvents: 'none' }}
+          />
+          <div className="video-info-container">
+            <div className="video-name">{video.name}</div>
+            <div className="video-location">{video.location || 'No location specified'}</div>
           </div>
-        );
-      })}
+          <button 
+            className={`favorite-button ${video.isFavorite ? 'favorited' : ''}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleFavorite(index);
+            }}
+          >
+            ★
+          </button>
+        </div>
+      ))}
     </div>
   );
 }
@@ -106,36 +108,149 @@ function LocationPopup({ isOpen, onClose, onSave, videoName }) {
   );
 }
 
-function VideoPlayer({ video, onClose }) {
+function VideoPlayer({ video, onClose, onNext, onPrev, hasNext, hasPrev }) {
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const videoRef = useRef(null);
+
+  // Mock incidents data - replace with your actual data
+  const incidents = [
+    { time: 30, description: "Person detected" },
+    { time: 120, description: "Motion detected" },
+    { time: 180, description: "Object detected" },
+    { time: 240, description: "Person detected" },
+  ];
+
+  const handleTimeUpdate = () => {
+    if (videoRef.current) {
+      setCurrentTime(videoRef.current.currentTime);
+    }
+  };
+
+  const handleLoadedMetadata = () => {
+    if (videoRef.current) {
+      setDuration(videoRef.current.duration);
+    }
+  };
+
+  const handleTimestampClick = (time) => {
+    if (videoRef.current) {
+      videoRef.current.currentTime = time;
+    }
+  };
+
+  const formatTime = (seconds) => {
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = Math.floor(seconds % 60);
+    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+  };
+
   if (!video) return null;
 
   return (
     <div className="video-player-overlay">
       <div className="video-player-container">
         <button className="close-button" onClick={onClose}>×</button>
-        <div className="video-player">
-          <iframe
-            src={video.url}
-            title={video.name}
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-            allowFullScreen
-            className="video-frame"
-          />
-        </div>
-        <div className="video-info">
-          <h2>{video.location || video.name}</h2>
+        <div className="video-player-content">
+          <div className="video-player-main">
+            <div className="video-player">
+              <video
+                ref={videoRef}
+                src={video.url}
+                title={video.name}
+                controls
+                autoPlay
+                className="video-frame"
+                onTimeUpdate={handleTimeUpdate}
+                onLoadedMetadata={handleLoadedMetadata}
+              />
+            </div>
+            <div className="video-info">
+              <h2>{video.location || video.name}</h2>
+              <div className="video-time">
+                {formatTime(currentTime)} / {formatTime(duration)}
+              </div>
+            </div>
+            <div className="video-navigation">
+              <button 
+                className="nav-button prev" 
+                onClick={onPrev}
+                disabled={!hasPrev}
+              >
+                ← Previous
+              </button>
+              <button 
+                className="nav-button next" 
+                onClick={onNext}
+                disabled={!hasNext}
+              >
+                Next →
+              </button>
+            </div>
+          </div>
+          <div className="video-timeline">
+            <h3>Timeline</h3>
+            <div className="incidents-list">
+              {incidents.map((incident, index) => (
+                <div 
+                  key={index}
+                  className={`incident-item ${currentTime >= incident.time && currentTime < incident.time + 5 ? 'active' : ''}`}
+                  onClick={() => handleTimestampClick(incident.time)}
+                >
+                  <div className="incident-time">{formatTime(incident.time)}</div>
+                  <div className="incident-description">{incident.description}</div>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     </div>
   );
 }
 
-function VideoPage({ videos, onVideoClick, onToggleFavorite, showFavoritesOnly }) {
+function VideoPage({ onVideoClick, onToggleFavorite, showFavoritesOnly }) {
   const [selectedVideo, setSelectedVideo] = useState(null);
   const [showLocationPopup, setShowLocationPopup] = useState(false);
   const [pendingVideo, setPendingVideo] = useState(null);
+  const [videos, setVideos] = useState([]);
   const fileInputRef = useRef(null);
   const location = useLocation();
+
+  useEffect(() => {
+    fetchUserVideos();
+  }, []);
+
+  const fetchUserVideos = async () => {
+    try {
+      const params = {
+        Bucket: process.env.REACT_APP_AWS_BUCKET_NAME,
+        Prefix: 'videos/'
+      };
+
+      const data = await s3.listObjectsV2(params).promise();
+      
+      const videos = await Promise.all(
+        data.Contents.map(async (item) => {
+          const url = await s3.getSignedUrlPromise('getObject', {
+            Bucket: process.env.REACT_APP_AWS_BUCKET_NAME,
+            Key: item.Key,
+            Expires: 3600
+          });
+          
+          return {
+            url,
+            name: item.Key.split('/').pop(),
+            key: item.Key
+          };
+        })
+      );
+
+      setVideos(videos);
+    } catch (error) {
+      console.error('Error fetching videos:', error);
+    }
+  };
 
   const handleUploadClick = () => {
     fileInputRef.current.click();
@@ -145,37 +260,33 @@ function VideoPage({ videos, onVideoClick, onToggleFavorite, showFavoritesOnly }
     const file = event.target.files[0];
     if (file && file.type.startsWith('video/')) {
       try {
-        const bucketName = process.env.REACT_APP_AWS_BUCKET_NAME;
-        if (!bucketName) {
-          throw new Error('Bucket name is not defined in environment variables');
-        }
-
-        // Generate a unique key for the video
         const key = `videos/${Date.now()}-${file.name}`;
         
         // Upload the file to S3
-        const uploadParams = {
-          Bucket: bucketName,
+        await s3.putObject({
+          Bucket: process.env.REACT_APP_AWS_BUCKET_NAME,
           Key: key,
           Body: file,
           ContentType: file.type
-        };
-        console.log('Upload params:', uploadParams);
-        
-        await s3.putObject(uploadParams).promise();
+        }).promise();
         
         // Get the signed URL for the uploaded video
-        const urlParams = {
-          Bucket: bucketName,
+        const url = await s3.getSignedUrlPromise('getObject', {
+          Bucket: process.env.REACT_APP_AWS_BUCKET_NAME,
           Key: key,
-          Expires: 3600 // URL expires in 1 hour
+          Expires: 3600
+        });
+        
+        // Add the new video to the state
+        const newVideo = {
+          url,
+          name: file.name,
+          key: key,
+          isFavorite: false
         };
-        console.log('URL params:', urlParams);
         
-        const url = await s3.getSignedUrlPromise('getObject', urlParams);
-        
-        const videoUrl = url;
-        setPendingVideo({ url: videoUrl, name: file.name, key });
+        setVideos(prevVideos => [...prevVideos, newVideo]);
+        setPendingVideo(newVideo);
         setShowLocationPopup(true);
       } catch (error) {
         console.error('Error uploading video:', error);
@@ -185,34 +296,44 @@ function VideoPage({ videos, onVideoClick, onToggleFavorite, showFavoritesOnly }
 
   const handleLocationSave = (location, customName) => {
     if (pendingVideo) {
-      onVideoClick({ 
-        ...pendingVideo, 
-        location, 
-        customName,
-        isFavorite: false 
-      }, videos.length);
+      setVideos(prevVideos => 
+        prevVideos.map(video => 
+          video.key === pendingVideo.key 
+            ? { ...video, location, customName }
+            : video
+        )
+      );
       setPendingVideo(null);
     }
     setShowLocationPopup(false);
   };
 
-  const handleCloseExpanded = () => {
+  const handleVideoClick = (video, index) => {
+    setSelectedVideo({ ...video, index });
+  };
+
+  const handleCloseVideo = () => {
     setSelectedVideo(null);
   };
 
-  const navigateVideo = (direction) => {
-    if (!selectedVideo) return;
-    
-    const currentVideos = showFavoritesOnly 
-      ? videos.filter(video => video.isFavorite)
-      : videos;
-    
-    const currentIndex = currentVideos.findIndex(v => v.url === selectedVideo.url);
-    const newIndex = direction === 'next' 
-      ? (currentIndex + 1) % currentVideos.length 
-      : (currentIndex - 1 + currentVideos.length) % currentVideos.length;
-    
-    setSelectedVideo({ ...currentVideos[newIndex], index: newIndex });
+  const handleNextVideo = () => {
+    if (selectedVideo && selectedVideo.index < videos.length - 1) {
+      setSelectedVideo({ ...videos[selectedVideo.index + 1], index: selectedVideo.index + 1 });
+    }
+  };
+
+  const handlePrevVideo = () => {
+    if (selectedVideo && selectedVideo.index > 0) {
+      setSelectedVideo({ ...videos[selectedVideo.index - 1], index: selectedVideo.index - 1 });
+    }
+  };
+
+  const handleToggleFavorite = (index) => {
+    setVideos(prevVideos => 
+      prevVideos.map((video, i) => 
+        i === index ? { ...video, isFavorite: !video.isFavorite } : video
+      )
+    );
   };
 
   return (
@@ -230,10 +351,22 @@ function VideoPage({ videos, onVideoClick, onToggleFavorite, showFavoritesOnly }
       
       <VideoGrid
         videos={videos}
-        onVideoClick={setSelectedVideo}
-        onToggleFavorite={onToggleFavorite}
+        onVideoClick={handleVideoClick}
+        onToggleFavorite={handleToggleFavorite}
         showFavoritesOnly={showFavoritesOnly}
+        isPlaying={!selectedVideo}
       />
+
+      {selectedVideo && (
+        <VideoPlayer
+          video={selectedVideo}
+          onClose={handleCloseVideo}
+          onNext={handleNextVideo}
+          onPrev={handlePrevVideo}
+          hasNext={selectedVideo.index < videos.length - 1}
+          hasPrev={selectedVideo.index > 0}
+        />
+      )}
 
       <LocationPopup
         isOpen={showLocationPopup}
@@ -241,41 +374,6 @@ function VideoPage({ videos, onVideoClick, onToggleFavorite, showFavoritesOnly }
         onSave={handleLocationSave}
         videoName={pendingVideo?.name || ''}
       />
-
-      {selectedVideo && (
-        <div className="expanded-video-container">
-          <div className="expanded-video-overlay" onClick={handleCloseExpanded}></div>
-          <div className="expanded-video-content">
-            <div className="video-player-container">
-              <button className="nav-video-button prev" onClick={() => navigateVideo('prev')}>←</button>
-              <video 
-                src={selectedVideo.url} 
-                className="expanded-video"
-                controls
-                autoPlay
-              />
-              <button className="nav-video-button next" onClick={() => navigateVideo('next')}>→</button>
-            </div>
-            <div className="incidents-section">
-              <h2>Incidents</h2>
-              <div className="incidents-list">
-                <div className="incident-item">
-                  <div className="incident-time">00:01:23</div>
-                  <div className="incident-description">Person detected</div>
-                </div>
-                <div className="incident-item">
-                  <div className="incident-time">00:02:45</div>
-                  <div className="incident-description">Motion detected</div>
-                </div>
-                <div className="incident-item">
-                  <div className="incident-time">00:03:12</div>
-                  <div className="incident-description">Object detected</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
