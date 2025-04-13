@@ -3,6 +3,8 @@ import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react
 import { s3 } from './aws-config';
 import HomePage from './components/HomePage';
 import './App.css';
+import ToastNotification from './components/ToastNotification'; // Import the ToastNotification component
+
 
 function NavBar() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -140,14 +142,8 @@ function VideoPlayer({ video, onClose, onNext, onPrev, hasNext, hasPrev }) {
   const [duration, setDuration] = useState(0);
   const videoRef = useRef(null);
   const [isExpanded, setIsExpanded] = useState(false);
-
-  // Mock incidents data - replace with your actual data
-  const incidents = [
-    { time: 30, description: "Person detected" },
-    { time: 120, description: "Motion detected" },
-    { time: 180, description: "Object detected" },
-    { time: 240, description: "Person detected" },
-  ];
+  const [incidents, setIncidents] = useState([]);
+  const [toast, setToast] = useState(null);
 
   const handleTimeUpdate = () => {
     if (videoRef.current) {
@@ -172,6 +168,49 @@ function VideoPlayer({ video, onClose, onNext, onPrev, hasNext, hasPrev }) {
     const remainingSeconds = Math.floor(seconds % 60);
     return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
+  
+  const handleAlertAdmin = async () => {
+    const videoKey = video.key;
+    if (!videoKey) {
+      console.error('Video key is required');
+      return;
+    }
+
+    try {
+      const response = await fetch(`http://localhost:8080/alert-email?video=${videoKey}`, {
+        method: 'GET',
+      });
+      const data = await response.json();
+      if (data.success) {
+        setToast({ message: 'Alert sent to administrator!', type: 'success' });
+      } else {
+        setToast({ message: 'Failed to send alert', type: 'error' });
+      }
+    } catch (error) {
+      console.error('Error triggering alert:', error);
+      setToast({ message: 'Error triggering alert', type: 'error' });
+    }
+  };
+
+  useEffect(() => {
+    const fetchIncidents = async () => {
+      if (!video?.key) return;
+  
+      try {
+        const response = await fetch(`http://localhost:8080/get-text-file?fileKey=${video.key}`);
+        if (!response.ok) {
+          throw new Error(`Failed to fetch incidents: ${response.status}`);
+        }
+  
+        const data = await response.json();
+        setIncidents(data);
+      } catch (error) {
+        console.error('Error fetching incidents:', error);
+      }
+    };
+  
+    fetchIncidents();
+  }, [video]);
 
   if (!video) return null;
 
@@ -207,6 +246,9 @@ function VideoPlayer({ video, onClose, onNext, onPrev, hasNext, hasPrev }) {
               >
                 ← Previous
               </button>
+              <button className="alert-admin-button" onClick={handleAlertAdmin}>
+                ALERT ADMINISTRATOR
+              </button>
               <button 
                 className="nav-button next" 
                 onClick={onNext}
@@ -219,20 +261,54 @@ function VideoPlayer({ video, onClose, onNext, onPrev, hasNext, hasPrev }) {
           <div className="video-timeline">
             <h3>Timeline</h3>
             <div className="incidents-list">
-              {incidents.map((incident, index) => (
-                <div 
-                  key={index}
-                  className={`incident-item ${currentTime >= incident.time && currentTime < incident.time + 5 ? 'active' : ''}`}
-                  onClick={() => handleTimestampClick(incident.time)}
-                >
-                  <div className="incident-time">{formatTime(incident.time)}</div>
-                  <div className="incident-description">{incident.description}</div>
-                </div>
-              ))}
+              {incidents
+                .filter((incident) => incident.eventType?.trim())
+                .map((incident, index) => {
+                  let eventClass = '';
+                  switch (incident.eventType) {
+                    case 'fallen':
+                      eventClass = 'event-fallen';
+                      break;
+                    case 'dangerous':
+                      eventClass = 'event-dangerous';
+                      break;
+                    case 'anger':
+                      eventClass = 'event-anger';
+                      break;
+                    case 'loud':
+                      eventClass = 'event-loud';
+                      break;
+                    case 'help':
+                      eventClass = 'event-help';
+                      break;
+                    default:
+                      eventClass = '';
+                  }
+
+                  return (
+                    <div
+                      key={index}
+                      id={`incident-${incident.time}`}
+                      className={`incident-item ${eventClass}`}
+                      onClick={() => handleTimestampClick(incident.time)}
+                    >
+                      <div className="incident-time">{formatTime(incident.time)}</div>
+                      <div className="incident-description">{incident.description}</div>
+                      <div className="incident-type">{incident.eventType}</div>
+                    </div>
+                  );
+                })}
             </div>
           </div>
         </div>
       </div>
+      {toast && (
+        <ToastNotification
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
+      )}
     </div>
   );
 }
@@ -269,13 +345,15 @@ function VideoPage({ videos, onVideoClick, onToggleFavorite, showFavoritesOnly =
     URL.revokeObjectURL(url); // Clean up
   };
 
-  const runScript = async (videoFilename) => {
+  const runScript = async (videoFilename, key) => {
     try {
-      console.log(`Running Python script for video: ${videoFilename}`);
-      const response = await fetch(`http://localhost:8080/run-python?video=${encodeURIComponent(videoFilename)}`);
+      console.log(`Running Python script for video: ${videoFilename} with key: ${key}`);
+      // Pass the key as a separate query parameter
+      const response = await fetch(`http://localhost:8080/run-python?video=${encodeURIComponent(videoFilename)}&key=${encodeURIComponent(key)}`);
       
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(`HTTP error! status: ${response.status}${errorData.error ? `: ${errorData.error}` : ''}`);
       }
       
       const result = await response.json();
@@ -291,8 +369,6 @@ function VideoPage({ videos, onVideoClick, onToggleFavorite, showFavoritesOnly =
     const file = event.target.files[0];
     if (file && file.type.startsWith('video/')) {
       try {
-        saveFileLocally(file);
-        await runScript(file.name);
         const key = `videos/${Date.now()}-${file.name}`;
         console.log(file.name);
         console.log(key);
@@ -316,6 +392,9 @@ function VideoPage({ videos, onVideoClick, onToggleFavorite, showFavoritesOnly =
           key: key,
           isFavorite: false
         };
+
+        saveFileLocally(file);
+        await runScript(file.name, key);
         
         setPendingVideo(newVideo);
         setShowLocationPopup(true);
@@ -364,6 +443,15 @@ function VideoPage({ videos, onVideoClick, onToggleFavorite, showFavoritesOnly =
       <div className="user-info">
         <p>Signed in as: {auth.user?.profile.email || auth.user?.profile.sub}</p>
       </div> */}
+      
+      <VideoGrid
+        videos={filteredVideos}
+        onVideoClick={handleVideoClick}
+        onToggleFavorite={onToggleFavorite}
+        showFavoritesOnly={showFavoritesOnly}
+        isPlaying={!selectedVideo}
+      />
+
       <input
         type="file"
         ref={fileInputRef}
@@ -376,14 +464,6 @@ function VideoPage({ videos, onVideoClick, onToggleFavorite, showFavoritesOnly =
           <button className="upload-button" onClick={handleUploadClick}>Upload Video</button>
         </div>
       )}
-      
-      <VideoGrid
-        videos={filteredVideos}
-        onVideoClick={handleVideoClick}
-        onToggleFavorite={onToggleFavorite}
-        showFavoritesOnly={showFavoritesOnly}
-        isPlaying={!selectedVideo}
-      />
 
       {selectedVideo && (
         <VideoPlayer
@@ -433,8 +513,6 @@ function App() {
             Key: item.Key,
             Expires: 3600
           });
-
-          // THIS URL SHOULD BE LOCAL
           
           return {
             url,

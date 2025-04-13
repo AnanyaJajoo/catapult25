@@ -38,6 +38,7 @@ body {
   position: sticky;
   top: 0;
   z-index: 999;
+  margin-bottom: 2rem;
 }
 
 .logo {
@@ -58,6 +59,17 @@ body {
   font-weight: 500;
   text-decoration: none;
   transition: color 0.3s;
+}
+
+.video-control-button {
+  min-height: 3rem;
+  padding: 0.75rem 1.5rem;
+  font-size: 1rem;
+  font-weight: bold;
+  border-radius: 0.5rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .nav-links a:hover,
@@ -108,6 +120,7 @@ body {
   display: flex;
   justify-content: center;
   width: 100%;
+  margin-top: 2rem;
   margin-bottom: 2rem;
 }
 
@@ -409,31 +422,65 @@ html, body {
 }
 
 .incident-item {
-  padding: 0.75rem;
-  background-color: rgba(255, 255, 255, 0.05);
-  border-radius: 0.5rem;
-  cursor: pointer;
-  transition: background-color 0.3s;
-}
-
-.incident-item:hover {
+  padding: 10px;
+  margin: 5px;
+  border: 1px solid #ccc;
+  border-radius: 12px;
+  transition: transform 0.3s ease, background-color 0.3s ease;
   background-color: rgba(255, 255, 255, 0.1);
+  cursor: pointer;
 }
 
-.incident-item.active {
-  background-color: var(--primary);
+/* Hover effect */
+.incident-item:hover {
+  background-color: #3a3a3a;
 }
 
+/* Event Types */
+.event-fallen {
+  color: yellow;
+}
+.event-dangerous {
+  color: red;
+}
+.event-anger {
+  color: orange;
+}
+.event-loud {
+  color: darkgoldenrod;
+}
+.event-help {
+  color: #ff4d4d;
+}
+
+/* Incident type styling */
+.incident-type {
+  margin-top: 5px;
+  font-style: italic;
+  font-weight: bold;
+  padding: 5px 10px;
+  border-radius: 12px;
+  border: 1px solid white;
+  background-color: transparent;
+  color: inherit;
+  font-size: 1.1rem;
+  font-weight: 600;
+  display: inline-block;
+}
+
+/* Specific styling for the time text */
 .incident-time {
   font-weight: 600;
   color: var(--text);
   margin-bottom: 0.25rem;
 }
 
+/* Specific styling for the description text */
 .incident-description {
   color: var(--text-secondary);
   font-size: 0.9rem;
 }
+
 
 /* Location Popup */
 .popup-overlay {
@@ -537,4 +584,21 @@ html, body {
 
 .popup-button.save:hover {
   background-color: var(--primary-dark);
+}
+
+.alert-admin-button {
+  color: red;
+  border: 2px solid white;
+  background: transparent;
+  padding: 0.75rem 1.5rem;
+  font-weight: bold;
+  font-size: 1.1rem;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.alert-admin-button:hover {
+  background-color: white;
+  color: red;
 }
