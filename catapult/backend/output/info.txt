@@ -1,0 +1,30 @@
+0.0 - No, No, No.
+
+Nothing appears wrong in the image.
+2.0 - No, Yes, No. 
+
+Things seem normal with knife in hand.
+18.0 - No, Yes, No. 
+
+Person appears calm, sharp object present, no visible falls.
+0.542 - loud
+2.056 - loud
+3.691 - loud
+4.9 - loud
+5.283 - loud
+5.622 - loud
+5.995 - loud
+7.042 - loud
+7.648 - loud
+8.205 - loud
+8.462 - loud
+8.84 - loud
+9.596 - loud
+9.884 - loud
+10.116 - loud
+11.673 - loud
+12.995 - loud
+13.98 - loud
+17.218 - loud
+18.642 - loud
+19.966 - loud

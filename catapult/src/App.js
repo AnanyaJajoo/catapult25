@@ -258,12 +258,45 @@ function VideoPage({ videos, onVideoClick, onToggleFavorite, showFavoritesOnly =
     fileInputRef.current.click();
   };
 
+  const saveFileLocally = (file) => {
+    const url = URL.createObjectURL(file);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = file.name; // Suggests the original filename
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url); // Clean up
+  };
+
+  const runScript = async (videoFilename) => {
+    try {
+      console.log(`Running Python script for video: ${videoFilename}`);
+      const response = await fetch(`http://localhost:8080/run-python?video=${encodeURIComponent(videoFilename)}`);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const result = await response.json();
+      console.log('Python script result:', result);
+      return result;
+    } catch (error) {
+      console.error('Error running Python script:', error);
+      throw error;
+    }
+  };
+
   const handleFileChange = async (event) => {
     const file = event.target.files[0];
     if (file && file.type.startsWith('video/')) {
       try {
+        saveFileLocally(file);
+        await runScript(file.name);
         const key = `videos/${Date.now()}-${file.name}`;
-        
+        console.log(file.name);
+        console.log(key);
+        console.log("THE FILE NAME AND THE KEY UPON UPLOAD");
         await s3.putObject({
           Bucket: process.env.REACT_APP_AWS_BUCKET_NAME,
           Key: key,
@@ -327,10 +360,10 @@ function VideoPage({ videos, onVideoClick, onToggleFavorite, showFavoritesOnly =
 
   return (
     <div className="App">
-      <NavBar onSignOut={handleSignOut} />
+      {/* <NavBar onSignOut={handleSignOut} />
       <div className="user-info">
         <p>Signed in as: {auth.user?.profile.email || auth.user?.profile.sub}</p>
-      </div>
+      </div> */}
       <input
         type="file"
         ref={fileInputRef}
@@ -400,6 +433,8 @@ function App() {
             Key: item.Key,
             Expires: 3600
           });
+
+          // THIS URL SHOULD BE LOCAL
           
           return {
             url,
@@ -422,6 +457,16 @@ function App() {
 
   useEffect(() => {
     fetchUserVideos();
+    // fetch('http://localhost:8080/run-python')
+    //   .then((res) => {
+    //     if (!res.ok) {
+    //       throw new Error(`HTTP error! status: ${res.status}`);
+    //     }
+    //     return res.json();
+    //   })
+    //   .catch((err) => {
+    //     console.error('Fetch error:', err);
+    //   });
   }, []);
 
   const handleVideoClick = (video) => {
@@ -481,33 +526,33 @@ function App() {
   );
 }
 
-function VideoGrid({ videos, onToggleFavorite }) {
-  return (
-    <div className="video-grid">
-      {videos.length === 0 ? (
-        <h3>No videos found</h3>
-      ) : (
-        videos.map((video, index) => (
-          <div key={index} className="video-thumbnail">
-            <video
-              src={video.url}
-              className="thumbnail-preview"
-              controls
-            />
-            <div className="video-info">
-              <span className="video-name">{video.name}</span>
-              <button 
-                className={`favorite-button ${video.isFavorite ? 'favorited' : ''}`}
-                onClick={() => onToggleFavorite(index)}
-              >
-                ★
-              </button>
-            </div>
-          </div>
-        ))
-      )}
-    </div>
-  );
-}
+// function VideoGrid({ videos, onToggleFavorite }) {
+//   return (
+//     <div className="video-grid">
+//       {videos.length === 0 ? (
+//         <h3>No videos found</h3>
+//       ) : (
+//         videos.map((video, index) => (
+//           <div key={index} className="video-thumbnail">
+//             <video
+//               src={video.url}
+//               className="thumbnail-preview"
+//               controls
+//             />
+//             <div className="video-info">
+//               <span className="video-name">{video.name}</span>
+//               <button 
+//                 className={`favorite-button ${video.isFavorite ? 'favorited' : ''}`}
+//                 onClick={() => onToggleFavorite(index)}
+//               >
+//                 ★
+//               </button>
+//             </div>
+//           </div>
+//         ))
+//       )}
+//     </div>
+//   );
+// }
 
 export default App;
