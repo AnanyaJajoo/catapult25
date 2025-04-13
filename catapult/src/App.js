@@ -1,345 +1,330 @@
-import { useState, useEffect, useRef } from 'react';
-import { Routes, Route, Link, useLocation, Navigate } from 'react-router-dom';
-import { useAuth } from 'react-oidc-context';
-import AWS from 'aws-sdk';
+import React, { useState, useRef, useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
+import { s3 } from './aws-config';
+import HomePage from './components/HomePage';
 import './App.css';
 
-function NavBar({ onSignOut }) {
+function NavBar() {
+  const [searchQuery, setSearchQuery] = useState('');
   const location = useLocation();
+  const isHomePage = location.pathname === '/';
 
+  if (isHomePage) return null;
 
   return (
     <nav className="nav-bar">
-      <div className="nav-buttons">
-        <Link to="/" className={`nav-button ${location.pathname === '/' ? 'active' : ''}`}>
-          All Videos
-        </Link>
-        <Link to="/favorites" className={`nav-button ${location.pathname === '/favorites' ? 'active' : ''}`}>
-          Favorites
-        </Link>
-        <Link to="/realtime" className={`nav-button ${location.pathname === '/realtime' ? 'active' : ''}`}>
-          Realtime
-        </Link>
-        <button className="signout-button" onClick={onSignOut}>Sign Out</button>
+      <Link to="/" className="logo">Spectra</Link>
+      <div className="nav-links">
+        <Link to="/">Home</Link>
+        <Link to="/videos">All Videos</Link>
+        <Link to="/favorites">Favorites</Link>
+        <div className="search-container">
+          <input
+            type="text"
+            placeholder="Search videos..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="search-input"
+          />
+        </div>
       </div>
     </nav>
   );
 }
 
-function App() {
-  const auth = useAuth();
-  const [videos, setVideos] = useState([]);
+function VideoGrid({ videos, onVideoClick, onToggleFavorite, showFavoritesOnly = false, isPlaying = false }) {
+  const displayedVideos = showFavoritesOnly 
+    ? videos.filter(video => video.isFavorite)
+    : videos;
+
+  return (
+    <div className="video-grid">
+      {displayedVideos.map((video, index) => (
+        <div 
+          key={index} 
+          className="video-thumbnail"
+          onClick={() => onVideoClick(video, index)}
+        >
+          <video 
+            src={video.url}
+            className="thumbnail-preview"
+            title={video.customName || video.name}
+            muted
+            autoPlay
+            loop
+            playsInline
+            style={{ pointerEvents: 'none' }}
+          />
+          <div className="video-info-container">
+            <div className="video-name">{video.customName || video.name}</div>
+            <div className="video-location">{video.location || 'No location specified'}</div>
+          </div>
+          <button 
+            className={`favorite-button ${video.isFavorite ? 'favorited' : ''}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleFavorite(index);
+            }}
+          >
+            ★
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function LocationPopup({ isOpen, onClose, onSave, videoName }) {
+  const [location, setLocation] = useState('');
+  const [customName, setCustomName] = useState('');
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (isOpen) {
+      setLocation('');
+      setCustomName('');
+      setError('');
+    }
+  }, [isOpen]);
+
+  const handleSave = () => {
+    if (!customName.trim()) {
+      setError('Please enter a video name');
+      return;
+    }
+    onSave(location.trim(), customName.trim());
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="popup-overlay">
+      <div className="popup-content">
+        <h2>Add Video Details</h2>
+        <div className="popup-form">
+          <div className="form-group">
+            <label htmlFor="video-name">Video Name</label>
+            <input
+              id="video-name"
+              type="text"
+              placeholder="Enter video name"
+              value={customName}
+              onChange={(e) => setCustomName(e.target.value)}
+              className="location-input"
+            />
+            {error && <span className="error-message">{error}</span>}
+          </div>
+          <div className="form-group">
+            <label htmlFor="video-location">Location</label>
+            <input
+              id="video-location"
+              type="text"
+              placeholder="Enter video location"
+              value={location}
+              onChange={(e) => setLocation(e.target.value)}
+              className="location-input"
+            />
+          </div>
+        </div>
+        <div className="popup-buttons">
+          <button className="popup-button cancel" onClick={onClose}>Cancel</button>
+          <button className="popup-button save" onClick={handleSave}>Save</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function VideoPlayer({ video, onClose, onNext, onPrev, hasNext, hasPrev }) {
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const videoRef = useRef(null);
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  // Mock incidents data - replace with your actual data
+  const incidents = [
+    { time: 30, description: "Person detected" },
+    { time: 120, description: "Motion detected" },
+    { time: 180, description: "Object detected" },
+    { time: 240, description: "Person detected" },
+  ];
+
+  const handleTimeUpdate = () => {
+    if (videoRef.current) {
+      setCurrentTime(videoRef.current.currentTime);
+    }
+  };
+
+  const handleLoadedMetadata = () => {
+    if (videoRef.current) {
+      setDuration(videoRef.current.duration);
+    }
+  };
+
+  const handleTimestampClick = (time) => {
+    if (videoRef.current) {
+      videoRef.current.currentTime = time;
+    }
+  };
+
+  const formatTime = (seconds) => {
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = Math.floor(seconds % 60);
+    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+  };
+
+  if (!video) return null;
+
+  return (
+    <div className={`video-player-overlay ${isExpanded ? 'expanded' : ''}`}>
+      <div className="video-player-container">
+        <button className="close-button" onClick={onClose}>×</button>
+        <div className="video-player-content">
+          <div className="video-player-main">
+            <div className="video-player">
+              <video
+                ref={videoRef}
+                src={video.url}
+                title={video.name}
+                controls
+                autoPlay
+                className="video-frame"
+                onTimeUpdate={handleTimeUpdate}
+                onLoadedMetadata={handleLoadedMetadata}
+              />
+            </div>
+            <div className="video-info">
+              <h2>{video.location || video.name}</h2>
+              <div className="video-time">
+                {formatTime(currentTime)} / {formatTime(duration)}
+              </div>
+            </div>
+            <div className="video-navigation">
+              <button 
+                className="nav-button prev" 
+                onClick={onPrev}
+                disabled={!hasPrev}
+              >
+                ← Previous
+              </button>
+              <button 
+                className="nav-button next" 
+                onClick={onNext}
+                disabled={!hasNext}
+              >
+                Next →
+              </button>
+            </div>
+          </div>
+          <div className="video-timeline">
+            <h3>Timeline</h3>
+            <div className="incidents-list">
+              {incidents.map((incident, index) => (
+                <div 
+                  key={index}
+                  className={`incident-item ${currentTime >= incident.time && currentTime < incident.time + 5 ? 'active' : ''}`}
+                  onClick={() => handleTimestampClick(incident.time)}
+                >
+                  <div className="incident-time">{formatTime(incident.time)}</div>
+                  <div className="incident-description">{incident.description}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function VideoPage({ videos, onVideoClick, onToggleFavorite, showFavoritesOnly = false, searchQuery = '' }) {
+  const [selectedVideo, setSelectedVideo] = useState(null);
+  const [showLocationPopup, setShowLocationPopup] = useState(false);
+  const [pendingVideo, setPendingVideo] = useState(null);
   const fileInputRef = useRef(null);
-  const [s3Client, setS3Client] = useState(null);
-  const [authError, setAuthError] = useState('');
-  
-  // Add this effect to detect return from authentication
-  useEffect(() => {
-    // Check if we're returning from auth redirect (has 'code' in URL)
-    const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.has('code')) {
-      console.log("Auth code detected in URL - likely returning from authentication");
-      
-      // Clean up the URL by removing the code
-      window.history.replaceState({}, document.title, window.location.pathname);
-      
-      // The auth library should handle the code automatically
-      // We just need to wait for auth state to update
-    }
-  }, []);
-  
-  // Debug authentication state with more detailed logging
-  useEffect(() => {
-    console.log('Auth state updated:', {
-      isLoading: auth.isLoading,
-      isAuthenticated: auth.isAuthenticated,
-      activeNavigator: auth.activeNavigator,
-      hasUser: !!auth.user,
-      error: auth.error
-    });
-    
-    if (auth.isAuthenticated && auth.user) {
-      console.log("User authenticated with claims:", auth.user.profile);
-    }
-    
-    if (auth.error) {
-      console.error('Auth error details:', auth.error);
-      setAuthError(auth.error.message);
-    }
-  }, [auth.isLoading, auth.isAuthenticated, auth.activeNavigator, auth.user, auth.error]);
-  
-  // Configure S3 client when authentication token is available
-  useEffect(() => {
-    if (auth.isAuthenticated && auth.user) {
-      console.log("User authenticated, configuring S3...");
-      
-      // Try up to 3 times with increasing delays
-      const tryConfigureS3 = (attempt = 1) => {
-        configureS3Client().catch(err => {
-          console.error(`S3 configuration error (attempt ${attempt}):`, err);
-          
-          if (attempt < 3) {
-            console.log(`Retrying in ${attempt * 2} seconds...`);
-            setTimeout(() => tryConfigureS3(attempt + 1), attempt * 2000);
-          }
-        });
-      };
-      
-      tryConfigureS3();
-    }
-  }, [auth.isAuthenticated, auth.user]);
 
-  
-  // Sign out handler with improved error handling
-  const handleSignOut = () => {
-    try {
-      auth.removeUser();
-      const clientId = process.env.REACT_APP_USER_POOL_WEB_CLIENT_ID;
-      const logoutUri = encodeURIComponent(process.env.REACT_APP_REDIRECT_URI);
-      const cognitoDomain = process.env.REACT_APP_COGNITO_DOMAIN;
-      
-      if (!cognitoDomain) {
-        console.error("Cognito domain is not defined");
-        return;
-      }
-      
-      // Handle trailing slash in the domain
-      const domainWithoutTrailingSlash = cognitoDomain.endsWith('/') 
-        ? cognitoDomain.slice(0, -1) 
-        : cognitoDomain;
-        
-      window.location.href = `${domainWithoutTrailingSlash}/logout?client_id=${clientId}&logout_uri=${logoutUri}`;
-    } catch (error) {
-      console.error("Error during sign out:", error);
-      // Force clear local storage as fallback
-      localStorage.clear();
-      sessionStorage.clear();
-      window.location.href = process.env.REACT_APP_REDIRECT_URI;
-    }
-  };
-  
-  // Handle sign-in click with error handling
-  const handleSignIn = () => {
-    try {
-      // Clear any previous auth errors
-      setAuthError('');
-      
-      // Hard-code the URL completely for testing
-      const loginUrl = 'https://us-east-2dzzxd9fgw.auth.us-east-2.amazoncognito.com/login?client_id=qao1r6646c227dp1hspr4ptrj&response_type=code&scope=email+openid+phone&redirect_uri=http%3A%2F%2Flocalhost%3A3000';
-      
-      console.log("Redirecting to hard-coded URL:", loginUrl);
-      
-      // Redirect to the login URL
-      window.location.href = loginUrl;
-    } catch (error) {
-      console.error("Exception during sign-in:", error);
-      setAuthError(`Sign-in exception: ${error.message}`);
-    }
-  };
-  
-  // Configure S3 client when authentication token is available
-  useEffect(() => {
-    if (auth.isAuthenticated && auth.user) {
-      console.log("User authenticated, configuring S3...");
-      configureS3Client().catch(err => {
-        console.error("S3 configuration error:", err);
-      });
-    }
-  }, [auth.isAuthenticated, auth.user]);
+  // Filter videos based on search query
+  const filteredVideos = videos.filter(video => {
+    if (!searchQuery) return true;
+    const searchLower = searchQuery.toLowerCase();
+    return (
+      (video.customName && video.customName.toLowerCase().includes(searchLower)) ||
+      (video.location && video.location.toLowerCase().includes(searchLower)) ||
+      (video.name && video.name.toLowerCase().includes(searchLower))
+    );
+  });
 
-  // Configure S3 client with improved error handling
-  const configureS3Client = async () => {
-    try {
-      console.log("Starting S3 client configuration");
-      
-      // Set up AWS credentials using the OIDC tokens
-      AWS.config.region = process.env.REACT_APP_REGION || 'us-east-2';
-      
-      // Debug token
-      console.log("ID Token available:", !!auth.user?.id_token);
-      
-      // Create credentials using Cognito Identity Pool
-      AWS.config.credentials = new AWS.CognitoIdentityCredentials({
-        IdentityPoolId: process.env.REACT_APP_IDENTITY_POOL_ID,
-        Logins: {
-          [`cognito-idp.${process.env.REACT_APP_REGION}.amazonaws.com/${process.env.REACT_APP_USER_POOL_ID}`]: auth.user.id_token
-        }
-      });
-      
-      console.log("Refreshing AWS credentials...");
-      
-      // Refresh the credentials
-      await new Promise((resolve, reject) => {
-        AWS.config.credentials.refresh(err => {
-          if (err) {
-            console.error("Credential refresh error:", err);
-            reject(err);
-          } else {
-            console.log("AWS credentials refreshed successfully");
-            resolve();
-          }
-        });
-      });
-      
-      console.log("Creating S3 client...");
-      
-      // Create a new S3 instance
-      const s3 = new AWS.S3({
-        region: process.env.REACT_APP_REGION || 'us-east-2',
-        params: { Bucket: process.env.REACT_APP_AWS_BUCKET_NAME || 'catapult2025' }
-      });
-      
-      setS3Client(s3);
-      
-      // Get the username from the token claims
-      const username = auth.user.profile.email || auth.user.profile.sub;
-      console.log("User identified as:", username);
-      
-      // Create folder for user and fetch videos
-      await createUserFolder(username, s3);
-      await fetchVideos(username, s3);
-      
-      return s3;
-    } catch (error) {
-      console.error('Error configuring S3:', error);
-      return null;
-    }
-  };
-
-  // Function to create a folder for the user
-  const createUserFolder = async (username, s3) => {
-    try {
-      // In S3, folders are just objects with "/" at the end
-      const params = {
-        Bucket: process.env.AWS_BUCKET_NAME || 'catapult2025',
-        Key: `${username}/`,
-        Body: ''
-      };
-      await s3.putObject(params).promise();
-      console.log(`Folder created for user: ${username}`);
-    } catch (error) {
-      console.error('Error creating folder:', error);
-    }
-  };
-
-  // Fetch videos from user's folder in S3
-  const fetchVideos = async (username, s3) => {
-    try {
-      const params = {
-        Bucket: process.env.AWS_BUCKET_NAME || 'catapult2025',
-        Prefix: `${username}/`,
-      };
-
-      const data = await s3.listObjectsV2(params).promise();
-      
-      if (data.Contents) {
-        const videoList = await Promise.all(
-          data.Contents
-            .filter(item => !item.Key.endsWith('/')) // Filter out folder objects
-            .map(async (item) => {
-              // Generate a signed URL for each video
-              const urlParams = {
-                Bucket: process.env.AWS_BUCKET_NAME || 'catapult2025',
-                Key: item.Key,
-                Expires: 3600 // URL expires in 1 hour
-              };
-              
-              const url = s3.getSignedUrl('getObject', urlParams);
-              return {
-                url,
-                name: item.Key.split('/').pop(),
-                isFavorite: false
-              };
-            })
-        );
-        setVideos(videoList);
-      }
-    } catch (error) {
-      console.error('Error fetching videos:', error);
-    }
-  };
-
-  // Handle file upload
-  const handleFileChange = async (event) => {
-    const file = event.target.files[0];
-    if (file && s3Client && auth.user) {
-      try {
-        const username = auth.user.profile.email || auth.user.profile.sub;
-        const fileName = `${Date.now()}-${file.name}`;
-        
-        const uploadParams = {
-          Bucket: process.env.AWS_BUCKET_NAME || 'catapult2025',
-          Key: `${username}/${fileName}`,
-          Body: file,
-          ContentType: file.type
-        };
-        
-        await s3Client.upload(uploadParams).promise();
-        console.log('Upload successful');
-        
-        // Refresh the video list
-        fetchVideos(username, s3Client);
-      } catch (error) {
-        console.error('Error uploading file:', error);
-      }
-    }
-  };
-
-  // Handle upload button click
   const handleUploadClick = () => {
     fileInputRef.current.click();
   };
-  
-  // Toggle favorite status
-  const toggleFavorite = (index) => {
-    const updatedVideos = [...videos];
-    updatedVideos[index].isFavorite = !updatedVideos[index].isFavorite;
-    setVideos(updatedVideos);
+
+  const handleFileChange = async (event) => {
+    const file = event.target.files[0];
+    if (file && file.type.startsWith('video/')) {
+      try {
+        const key = `videos/${Date.now()}-${file.name}`;
+        
+        await s3.putObject({
+          Bucket: process.env.REACT_APP_AWS_BUCKET_NAME,
+          Key: key,
+          Body: file,
+          ContentType: file.type
+        }).promise();
+        
+        const url = await s3.getSignedUrlPromise('getObject', {
+          Bucket: process.env.REACT_APP_AWS_BUCKET_NAME,
+          Key: key,
+          Expires: 3600
+        });
+        
+        const newVideo = {
+          url,
+          name: file.name,
+          key: key,
+          isFavorite: false
+        };
+        
+        setPendingVideo(newVideo);
+        setShowLocationPopup(true);
+      } catch (error) {
+        console.error('Error uploading video:', error);
+      }
+    }
   };
-  
-  // Handle loading and error states
-  if (auth.isLoading) {
-    return <div className="loading">Loading...</div>;
-  }
 
-  // Handle active navigator state (happens during redirect)
-  if (auth.activeNavigator) {
-    return <div className="loading">Redirecting for authentication...</div>;
-  }
+  const handleLocationSave = (location, customName) => {
+    if (pendingVideo) {
+      const updatedVideo = {
+        ...pendingVideo,
+        location,
+        customName
+      };
+      onVideoClick(updatedVideo);
+      setPendingVideo(null);
+    }
+    setShowLocationPopup(false);
+  };
 
-  if (auth.error) {
-    return <div className="error">Encountering error: {auth.error.message}</div>;
-  }
+  const handleVideoClick = (video, index) => {
+    setSelectedVideo({ ...video, index });
+  };
 
-  // Handle error state with more details
-  if (auth.error) {
-    return (
-      <div className="error-container">
-        <h2>Authentication Error</h2>
-        <p>{auth.error.message}</p>
-        <div className="error-details">
-          <pre>{JSON.stringify(auth.error, null, 2)}</pre>
-        </div>
-        <button onClick={() => window.location.href = process.env.REACT_APP_REDIRECT_URI}>
-          Return to Home
-        </button>
-      </div>
-    );
-  }
+  const handleCloseVideo = () => {
+    setSelectedVideo(null);
+  };
 
-  // Handle unauthenticated state
-  if (!auth.isAuthenticated) {
-    return (
-      <div className="login-container">
-        <h1>Catapult Video Manager</h1>
-        <button className="login-button" onClick={handleSignIn}>
-          Sign in with Cognito
-        </button>
-      </div>
-    );
-  }
+  const handleNextVideo = () => {
+    if (selectedVideo && selectedVideo.index < filteredVideos.length - 1) {
+      setSelectedVideo({ ...filteredVideos[selectedVideo.index + 1], index: selectedVideo.index + 1 });
+    }
+  };
 
-  // Render authenticated app
+  const handlePrevVideo = () => {
+    if (selectedVideo && selectedVideo.index > 0) {
+      setSelectedVideo({ ...filteredVideos[selectedVideo.index - 1], index: selectedVideo.index - 1 });
+    }
+  };
+
   return (
     <div className="App">
       <NavBar onSignOut={handleSignOut} />
@@ -353,25 +338,143 @@ function App() {
         accept="video/*"
         style={{ display: 'none' }}
       />
-      <button className="upload-button" onClick={handleUploadClick}>
-        Upload Video
-      </button>
+      {!showFavoritesOnly && (
+        <div className="upload-button-container">
+          <button className="upload-button" onClick={handleUploadClick}>Upload Video</button>
+        </div>
+      )}
       
+      <VideoGrid
+        videos={filteredVideos}
+        onVideoClick={handleVideoClick}
+        onToggleFavorite={onToggleFavorite}
+        showFavoritesOnly={showFavoritesOnly}
+        isPlaying={!selectedVideo}
+      />
+
+      {selectedVideo && (
+        <VideoPlayer
+          video={selectedVideo}
+          onClose={handleCloseVideo}
+          onNext={handleNextVideo}
+          onPrev={handlePrevVideo}
+          hasNext={selectedVideo.index < filteredVideos.length - 1}
+          hasPrev={selectedVideo.index > 0}
+        />
+      )}
+
+      <LocationPopup
+        isOpen={showLocationPopup}
+        onClose={() => setShowLocationPopup(false)}
+        onSave={handleLocationSave}
+        videoName={pendingVideo?.name || ''}
+      />
+    </div>
+  );
+}
+
+function App() {
+  const [videos, setVideos] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const fetchUserVideos = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      const params = {
+        Bucket: process.env.REACT_APP_AWS_BUCKET_NAME,
+        Prefix: 'videos/'
+      };
+
+      console.log('Fetching videos with params:', params);
+      const data = await s3.listObjectsV2(params).promise();
+      console.log('Received S3 data:', data);
+      
+      const videos = await Promise.all(
+        data.Contents.map(async (item) => {
+          const url = await s3.getSignedUrlPromise('getObject', {
+            Bucket: process.env.REACT_APP_AWS_BUCKET_NAME,
+            Key: item.Key,
+            Expires: 3600
+          });
+          
+          return {
+            url,
+            name: item.Key.split('/').pop(),
+            key: item.Key,
+            isFavorite: false
+          };
+        })
+      );
+
+      console.log('Processed videos:', videos);
+      setVideos(videos);
+    } catch (error) {
+      console.error('Error fetching videos:', error);
+      setError(error.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchUserVideos();
+  }, []);
+
+  const handleVideoClick = (video) => {
+    setVideos(prevVideos => [...prevVideos, video]);
+  };
+
+  const handleToggleFavorite = (index) => {
+    const updatedVideos = [...videos];
+    updatedVideos[index].isFavorite = !updatedVideos[index].isFavorite;
+    setVideos(updatedVideos);
+  };
+
+  if (isLoading) {
+    return (
+      <div className="loading-container">
+        <div className="loading-spinner"></div>
+        <p>Loading videos...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="error-container">
+        <h2>Error Loading Videos</h2>
+        <p>{error}</p>
+        <button onClick={fetchUserVideos}>Try Again</button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="main-wrapper">
+      <NavBar searchQuery={searchQuery} onSearchChange={setSearchQuery} />
       <Routes>
-        <Route path="/" element={
-          <VideoGrid 
-            videos={videos} 
-            onToggleFavorite={toggleFavorite}
+        <Route path="/" element={<HomePage />} />
+        <Route path="/videos" element={
+          <VideoPage
+            videos={videos}
+            onVideoClick={handleVideoClick}
+            onToggleFavorite={handleToggleFavorite}
+            showFavoritesOnly={false}
+            searchQuery={searchQuery}
           />
         } />
         <Route path="/favorites" element={
-          <VideoGrid 
-            videos={videos.filter(v => v.isFavorite)} 
-            onToggleFavorite={toggleFavorite}
+          <VideoPage
+            videos={videos}
+            onVideoClick={handleVideoClick}
+            onToggleFavorite={handleToggleFavorite}
+            showFavoritesOnly={true}
+            searchQuery={searchQuery}
           />
-        } />
-        <Route path="/realtime" element={
-          <div className="realtime-placeholder">Realtime feature coming soon</div>
         } />
       </Routes>
     </div>
