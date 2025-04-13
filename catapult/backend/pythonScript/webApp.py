@@ -247,7 +247,7 @@ async def detect_loud_chunks(audio_file_path):
     audio = await loop.run_in_executor(None, AudioSegment.from_mp3, audio_file_path)
 
     # Detect non-silent chunks asynchronously
-    nonsilent_ranges = await loop.run_in_executor(None, silence.detect_nonsilent, audio, 100, -10)
+    nonsilent_ranges = await loop.run_in_executor(None, silence.detect_nonsilent, audio, 100, -7.5)
 
     # Print the detected ranges (in milliseconds)
     for start, end in nonsilent_ranges:
@@ -435,7 +435,7 @@ async def process_video(mp4_path):
     cv2.destroyAllWindows()
 
 # Main async function
-async def main(video_name):
+async def main(video_name, output_name):
     global fps
     video_path = os.path.expanduser('~/Downloads/'+video_name)
     audio_path = 'processing_data/temp.mp3'
@@ -451,7 +451,7 @@ async def main(video_name):
 
     # Process the video frames
     
-    file = open("output/info.txt", 'w')
+    file = open("output/" + output_name[7:-3] + "txt", 'w')
     for i in shared_list:
         print(i)
         if(i[1] != 'loud' and i[1] != 'help'):
@@ -469,8 +469,9 @@ async def main(video_name):
 
 if __name__ == "__main__":
     # Expect one command-line argument: the video file name (e.g., video.mp4)
-    if len(sys.argv) < 2:
-        print("Usage: python3 webApp.py <video_filename>")
+    if len(sys.argv) < 3:
+        print("Usage: python3 webApp.py <video_filename> <video_key>")
         sys.exit(1)
     video_filename = sys.argv[1]
-    asyncio.run(main(video_filename))
+    video_key = sys.argv[2]
+    asyncio.run(main(video_filename, video_key))
