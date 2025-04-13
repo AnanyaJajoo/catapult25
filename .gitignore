@@ -142,5 +142,6 @@ catapult/.env
 catapult/node_modules/
 catapult/backend/output/
 catapult/backend/processing_data/
+catapult/backend/processing_data/whisper_model.pkl
 */.env
 .env
